@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@frankeypanel</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505; /* Deep dark night */
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Intro Text - Fade Out Effect */
+        #intro-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            z-index: 10;
+            text-shadow: 0 0 10px #ff00de, 0 0 20px #ff00de;
+            white-space: nowrap;
+            animation: fadeOut 4s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            70% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+        }
+        
+        /* Fog Overlay for Realism */
+        .fog {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.6) 100%);
+            z-index: 2;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+<div class="fog"></div>
+<div id="intro-text">@frankeypanel</div>
+
+<!-- High Quality Explosion Sound -->
+<audio id="boom-sound" preload="auto">
+    <source src="https://www.myinstants.com/media/sounds/explosion_1.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const introText = document.getElementById('intro-text');
+    const audio = document.getElementById('boom-sound');
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // --- REALISTIC SLOW RAIN ---
+    let drops = [];
+    const dropCount = 400; // Less drops for realism, not too crowded
+
+    function initRain() {
+        drops = [];
+        for(let i = 0; i < dropCount; i++) {
+            drops.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                speed: Math.random() * 8 + 4, // Slower speed
+                length: Math.random() * 20 + 10,
+                opacity: Math.random() * 0.4 + 0.1 // More transparent
+            });
+        }
+    }
+    initRain();
+
+    // --- REALISTIC FIREWORKS ---
+    let fireworks = [];
+    let particles = [];
+    let lastBoomTime = 0;
+
+    class Firework {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = canvas.height;
+            this.targetY = Math.random() * (canvas.height / 2) + 50;
+            this.speed = Math.random() * 4 + 3; // Slower rise
+            this.color = `hsl(${Math.random() * 360}, 100%, 60%)`;
+            this.exploded = false;
+            this.trail = [];
+        }
+        update() {
+            if (!this.exploded) {
+                this.trail.push({x: this.x, y: this.y});
+                if(this.trail.length > 10) this.trail.shift();
+                
+                this.y -= this.speed;
+                if (this.y <= this.targetY) {
+                    this.explode();
+                }
+            }
+        }
+        explode() {
+            this.exploded = true;
+            
+            // Play Sound only on big explosions
+            playSound();
+            
+            // Create dense particles
+            for (let i = 0; i < 80; i++) { // More particles
+                particles.push(new Particle(this.x, this.y, this.color));
+            }
+        }
+        draw() {
+            if (!this.exploded) {
+                // Draw Trail
+                ctx.beginPath();
+                for(let i=0; i<this.trail.length; i++){
+                    ctx.fillStyle = `rgba(255, 255, 255, ${i/this.trail.length})`;
+                    ctx.fillRect(this.trail[i].x, this.trail[i].y, 2, 2);
+                }
+                
+                // Head
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            // Spread out more for realistic burst
+            this.vx = (Math.random() - 0.5) * 15; 
+            this.vy = (Math.random() - 0.5) * 15;
+            this.alpha = 1;
+            this.color = color;
+            this.gravity = 0.05; // Gravity effect
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.vy += this.gravity; // Fall down slowly
+            this.alpha -= 0.015; // Slow fade
+            this.vx *= 0.96; // Air resistance
+            this.vy *= 0.96;
+        }
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.alpha;
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 10; // Glow effect
+            ctx.shadowColor = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    function playSound() {
+        audio.currentTime = 0;
+        audio.play().catch(e => console.log("Audio blocked:", e));
+    }
+
+    // --- MAIN LOOP ---
+    function draw() {
+        // Clear with slight trail for motion blur
+        ctx.fillStyle = 'rgba(5, 5, 5, 0.3)'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Rain (Droplets)
+        ctx.strokeStyle = 'rgba(174, 194, 224, 0.6)'; 
+        ctx.lineWidth = 1;
+        for (let d of drops) {
+            ctx.beginPath();
+            ctx.moveTo(d.x, d.y);
+            ctx.lineTo(d.x, d.y + d.length);
+            ctx.stroke();
+            
+            d.y += d.speed;
+            if (d.y > canvas.height) {
+                d.y = -d.length;
+                d.x = Math.random() * canvas.width;
+            }
+        }
+
+        // Manage Fireworks (Limit active ones to keep it clean)
+        if (fireworks.length < 3 && Math.random() < 0.03) { 
+            fireworks.push(new Firework());
+        }
+
+        for (let i = fireworks.length - 1; i >= 0; i--) {
+            fireworks[i].update();
+            fireworks[i].draw();
+            if (fireworks[i].exploded) fireworks.splice(i, 1);
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update();
+            particles[i].draw();
+            if (particles[i].alpha <= 0) particles.splice(i, 1);
+        }
+    }
+
+    // Start Animation Loop
+    setInterval(draw, 16); 
+
+    // Sequence Logic
+    setTimeout(() => {
+        introText.style.display = 'none';
+        audio.play().catch(e => {});
+    }, 4000); // Intro shows for 4 seconds
+
+    // Click to ensure audio works
+    document.addEventListener('click', () => {
+        audio.play().catch(e => {});
+    }, { once: true });
+
+</script>
+
+</body>
+</html>
